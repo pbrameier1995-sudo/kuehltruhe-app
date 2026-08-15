@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>Kühltruhe Inventar</title>
+<meta name="theme-color" content="#0f172a" />
+<link rel="manifest" href="manifest.json" />
+<link rel="apple-touch-icon" href="icons/icon-192.png" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+  <!-- Bildschirm 1: Haushalts-Code eingeben (nur beim allerersten Öffnen pro Gerät) -->
+  <section id="setup-screen" class="screen">
+    <div class="setup-card">
+      <div class="brand">
+        <span class="brand-icon">🧊</span>
+        <h1>Kühltruhe Inventar</h1>
+      </div>
+      <p class="hint">
+        Gib einen <strong>Haushalts-Code</strong> ein. Alle Geräte, die denselben Code
+        benutzen, sehen dieselbe Liste. Du kannst dir den Code frei ausdenken
+        (z.&nbsp;B. ein Wort, das nur eure Familie kennt).
+      </p>
+      <input id="household-input" type="text" placeholder="z.B. mueller-kuehltruhe" autocomplete="off" autocapitalize="off" spellcheck="false" />
+      <button id="household-submit" class="btn-primary">Loslegen</button>
+      <p class="error" id="setup-error"></p>
+    </div>
+  </section>
+
+  <!-- Bildschirm 2: Die eigentliche App -->
+  <section id="app-screen" class="screen hidden">
+    <header class="app-header">
+      <div class="header-title">
+        <span class="brand-icon">🧊</span>
+        <div>
+          <h1>Kühltruhe</h1>
+          <p class="household-label" id="household-label"></p>
+        </div>
+      </div>
+      <button id="settings-btn" class="icon-btn" title="Haushalt wechseln">⚙️</button>
+    </header>
+
+    <div class="status-bar" id="status-bar">Verbinde…</div>
+
+    <form id="add-form" class="add-form">
+      <input id="item-name" type="text" placeholder="Was kommt in die Truhe?" autocomplete="off" required />
+      <input id="item-qty" type="number" min="1" step="1" value="1" inputmode="numeric" />
+      <button type="submit" class="btn-primary">+</button>
+    </form>
+
+    <div class="search-bar">
+      <input id="search-input" type="text" placeholder="Suchen…" autocomplete="off" />
+    </div>
+
+    <ul id="item-list" class="item-list"></ul>
+
+    <p id="empty-state" class="empty-state hidden">Die Truhe ist noch leer. Füge oben den ersten Artikel hinzu.</p>
+  </section>
+
+  <!-- Einstellungen-Overlay -->
+  <div id="settings-overlay" class="overlay hidden">
+    <div class="overlay-card">
+      <h2>Haushalt wechseln</h2>
+      <p class="hint">Aktueller Code: <strong id="current-code"></strong></p>
+      <input id="new-household-input" type="text" placeholder="Neuer Haushalts-Code" autocomplete="off" autocapitalize="off" spellcheck="false" />
+      <button id="switch-household-btn" class="btn-primary">Wechseln</button>
+      <button id="close-settings-btn" class="btn-secondary">Abbrechen</button>
+    </div>
+  </div>
+
+  <script type="module" src="app.js"></script>
+</body>
+</html>

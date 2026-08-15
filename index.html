@@ -49,15 +49,6 @@
     <form id="add-form" class="add-form">
       <input id="item-name" type="text" placeholder="Was kommt in die Truhe?" autocomplete="off" required />
       <input id="item-qty" type="number" min="1" step="1" value="1" inputmode="numeric" />
-      <select id="item-unit">
-        <option value="Stück">Stück</option>
-        <option value="Packung">Packung</option>
-        <option value="kg">kg</option>
-        <option value="g">g</option>
-        <option value="Liter">Liter</option>
-        <option value="ml">ml</option>
-        <option value="Portion">Portion</option>
-      </select>
       <button type="submit" class="btn-primary">+</button>
     </form>
 
@@ -78,16 +69,6 @@
       <input id="new-household-input" type="text" placeholder="Neuer Haushalts-Code" autocomplete="off" autocapitalize="off" spellcheck="false" />
       <button id="switch-household-btn" class="btn-primary">Wechseln</button>
       <button id="close-settings-btn" class="btn-secondary">Abbrechen</button>
-    </div>
-  </div>
-
-  <!-- Lösch-Bestätigung-Overlay -->
-  <div id="confirm-overlay" class="overlay hidden">
-    <div class="overlay-card">
-      <h2>Artikel löschen?</h2>
-      <p class="hint" id="confirm-text"></p>
-      <button id="confirm-delete-btn" class="btn-danger">Löschen</button>
-      <button id="cancel-delete-btn" class="btn-secondary">Abbrechen</button>
     </div>
   </div>
 

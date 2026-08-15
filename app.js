@@ -30,7 +30,6 @@ const statusBar = document.getElementById("status-bar");
 const addForm = document.getElementById("add-form");
 const itemNameInput = document.getElementById("item-name");
 const itemQtyInput = document.getElementById("item-qty");
-const itemUnitInput = document.getElementById("item-unit");
 const searchInput = document.getElementById("search-input");
 const itemList = document.getElementById("item-list");
 const emptyState = document.getElementById("empty-state");
@@ -40,29 +39,12 @@ const currentCodeLabel = document.getElementById("current-code");
 const newHouseholdInput = document.getElementById("new-household-input");
 const switchHouseholdBtn = document.getElementById("switch-household-btn");
 const closeSettingsBtn = document.getElementById("close-settings-btn");
-const confirmOverlay = document.getElementById("confirm-overlay");
-const confirmText = document.getElementById("confirm-text");
-const confirmDeleteBtn = document.getElementById("confirm-delete-btn");
-const cancelDeleteBtn = document.getElementById("cancel-delete-btn");
 
 const STORAGE_KEY = "kuehltruhe.haushaltscode";
-
-// Einheiten, deren Plural sich von der Singular-Form unterscheidet.
-const UNIT_PLURALS = {
-  Packung: "Packungen",
-  Portion: "Portionen",
-};
-
-function formatUnit(einheit, menge) {
-  const unit = einheit || "Stück";
-  if (menge === 1) return unit;
-  return UNIT_PLURALS[unit] || unit;
-}
 
 let app, db;
 let unsubscribe = null;
 let allItems = [];
-let pendingDeleteItem = null;
 
 // ---- Firebase initialisieren ----
 function initFirebase() {
@@ -196,7 +178,7 @@ function renderList() {
     delBtn.className = "delete-btn";
     delBtn.textContent = "🗑";
     delBtn.setAttribute("aria-label", "Artikel löschen");
-    delBtn.addEventListener("click", () => askDeleteConfirmation(item));
+    delBtn.addEventListener("click", () => removeItem(item));
 
     controls.append(minusBtn, qtyVal, plusBtn, delBtn);
     li.append(info, controls);
@@ -207,23 +189,20 @@ function renderList() {
 function metaLine(item) {
   const meta = document.createElement("span");
   meta.className = "item-meta";
-  meta.textContent = item.menge + " " + formatUnit(item.einheit, item.menge);
+  meta.textContent = item.menge === 1 ? "1 Stück" : item.menge + " Stück";
   return meta;
 }
 
 // ---- Aktionen ----
-async function addItem(name, qty, einheit) {
+async function addItem(name, qty) {
   const code = getSavedCode();
   if (!code || !db) return;
   const itemsRef = collection(db, "haushalte", code, "artikel");
 
-  // Falls der Artikel (gleicher Name UND gleiche Einheit) schon existiert,
-  // Menge erhöhen statt Duplikat anzulegen. Unterschiedliche Einheiten
-  // (z.B. "Erbsen" in Packung und "Erbsen" in kg) bleiben getrennt.
+  // Falls der Artikel (gleicher Name, klein geschrieben) schon existiert,
+  // Menge erhöhen statt Duplikat anzulegen.
   const existing = allItems.find(
-    (it) =>
-      it.name.toLowerCase() === name.toLowerCase() &&
-      (it.einheit || "Stück") === einheit
+    (it) => it.name.toLowerCase() === name.toLowerCase()
   );
   if (existing) {
     await changeQty(existing, qty);
@@ -233,7 +212,6 @@ async function addItem(name, qty, einheit) {
   await addDoc(itemsRef, {
     name: name,
     menge: qty,
-    einheit: einheit,
     erstelltAm: serverTimestamp(),
     aktualisiertAm: serverTimestamp(),
   });
@@ -258,31 +236,6 @@ async function removeItem(item) {
   await deleteDoc(ref);
 }
 
-// ---- Lösch-Bestätigung ----
-function askDeleteConfirmation(item) {
-  pendingDeleteItem = item;
-  confirmText.innerHTML =
-    'Soll <strong>"' +
-    escapeHtml(item.name) +
-    '"</strong> (' +
-    item.menge +
-    " " +
-    formatUnit(item.einheit, item.menge) +
-    ") wirklich gelöscht werden?";
-  confirmOverlay.classList.remove("hidden");
-}
-
-function closeConfirmOverlay() {
-  pendingDeleteItem = null;
-  confirmOverlay.classList.add("hidden");
-}
-
-function escapeHtml(str) {
-  const div = document.createElement("div");
-  div.textContent = str;
-  return div.innerHTML;
-}
-
 // ---- Event-Listener ----
 householdSubmit.addEventListener("click", () => {
   const code = normalizeCode(householdInput.value);
@@ -303,9 +256,8 @@ addForm.addEventListener("submit", async (e) => {
   e.preventDefault();
   const name = itemNameInput.value.trim();
   const qty = Math.max(1, parseInt(itemQtyInput.value, 10) || 1);
-  const einheit = itemUnitInput.value;
   if (!name) return;
-  await addItem(name, qty, einheit);
+  await addItem(name, qty);
   itemNameInput.value = "";
   itemQtyInput.value = "1";
   itemNameInput.focus();
@@ -328,17 +280,6 @@ switchHouseholdBtn.addEventListener("click", () => {
   saveCode(code);
   settingsOverlay.classList.add("hidden");
   showAppScreen(code);
-});
-
-confirmDeleteBtn.addEventListener("click", async () => {
-  if (pendingDeleteItem) {
-    await removeItem(pendingDeleteItem);
-  }
-  closeConfirmOverlay();
-});
-
-cancelDeleteBtn.addEventListener("click", () => {
-  closeConfirmOverlay();
 });
 
 // ---- Start ----

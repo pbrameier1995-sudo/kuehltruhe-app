@@ -16,7 +16,7 @@
 // };
 
 // Your web app's Firebase configuration
-const firebaseConfig = {
+export const firebaseConfig = {
   apiKey: "AIzaSyDHsnnJQBbmzWcIFtVeN0FxRKEgLFrAI8Q",
   authDomain: "kuehltruhe-14ab9.firebaseapp.com",
   projectId: "kuehltruhe-14ab9",

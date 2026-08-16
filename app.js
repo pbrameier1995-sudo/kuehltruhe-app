@@ -49,13 +49,26 @@ const cancelDeleteBtn = document.getElementById("cancel-delete-btn");
 
 const STORAGE_KEY = "kuehltruhe.haushaltscode";
 
+// Einheiten, bei denen eine zusätzliche Mengenangabe (z.B. "500 g") Sinn
+// ergibt. Stück, Packung und Portion sind reine Zähleinheiten – dafür
+// reicht die Anzahl, kein Zusatzfeld nötig.
+const MEASURE_UNITS = new Set(["g", "kg", "ml", "Liter"]);
+
+// Einheiten, deren Plural sich von der Singular-Form unterscheidet.
+const UNIT_PLURALS = {
+  Packung: "Packungen",
+  Portion: "Portionen",
+};
+
 // Baut die Anzeige für einen Artikel:
-// - Reine Stück-Artikel: "2 Stück"
-// - Artikel mit zusätzlicher Mengenangabe: "500 g · 2 Stück"
+// - Zähleinheiten (Stück/Packung/Portion): "2 Stück" bzw. "3 Packungen"
+// - Mengen-Einheiten mit Zusatzfeld: "500 g · 2 Stück"
 function formatMeta(item) {
   const einheit = item.einheit || "Stück";
-  if (einheit === "Stück" || item.einheitMenge == null) {
-    return item.menge + " Stück";
+  if (!MEASURE_UNITS.has(einheit) || item.einheitMenge == null) {
+    const label =
+      item.menge === 1 ? einheit : UNIT_PLURALS[einheit] || einheit;
+    return item.menge + " " + label;
   }
   return item.einheitMenge + " " + einheit + " · " + item.menge + " Stück";
 }
@@ -230,7 +243,7 @@ async function addItem(name, qty, einheit, einheitMenge) {
     if (it.name.toLowerCase() !== name.toLowerCase()) return false;
     const itEinheit = it.einheit || "Stück";
     if (itEinheit !== einheit) return false;
-    if (einheit === "Stück") return true;
+    if (!MEASURE_UNITS.has(einheit)) return true;
     return (it.einheitMenge ?? null) === (einheitMenge ?? null);
   });
   if (existing) {
@@ -242,7 +255,7 @@ async function addItem(name, qty, einheit, einheitMenge) {
     name: name,
     menge: qty,
     einheit: einheit,
-    einheitMenge: einheit === "Stück" ? null : einheitMenge,
+    einheitMenge: MEASURE_UNITS.has(einheit) ? einheitMenge : null,
     erstelltAm: serverTimestamp(),
     aktualisiertAm: serverTimestamp(),
   });
@@ -307,13 +320,13 @@ householdInput.addEventListener("keydown", (e) => {
 });
 
 itemUnitInput.addEventListener("change", () => {
-  if (itemUnitInput.value === "Stück") {
-    amountGroup.classList.add("hidden");
-    itemUnitAmountInput.value = "";
-  } else {
+  if (MEASURE_UNITS.has(itemUnitInput.value)) {
     amountGroup.classList.remove("hidden");
     itemUnitAmountInput.placeholder = "z. B. 500";
     itemUnitAmountInput.focus();
+  } else {
+    amountGroup.classList.add("hidden");
+    itemUnitAmountInput.value = "";
   }
 });
 
@@ -325,7 +338,7 @@ addForm.addEventListener("submit", async (e) => {
   if (!name) return;
 
   let einheitMenge = null;
-  if (einheit !== "Stück") {
+  if (MEASURE_UNITS.has(einheit)) {
     const amount = parseFloat(itemUnitAmountInput.value);
     if (!amount || amount <= 0) {
       itemUnitAmountInput.focus();

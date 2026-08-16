@@ -171,9 +171,33 @@ input[type="text"]:focus, input[type="number"]:focus {
   padding: 0 18px 10px;
 }
 
-.add-form #item-name { flex: 1; }
-.add-form #item-qty { width: 68px; }
-.add-form .btn-primary { width: 48px; margin-top: 0; font-size: 1.3rem; line-height: 1; }
+.add-form {
+  flex-direction: column;
+  align-items: stretch;
+}
+
+.field-group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.field-group label {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+.add-form #item-unit {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  color: var(--text);
+  border-radius: 10px;
+  padding: 13px 14px;
+  font-size: 1rem;
+}
+
+.add-form .btn-primary { margin-top: 2px; }
 
 .search-bar { padding: 0 18px 10px; }
 
@@ -229,6 +253,11 @@ input[type="text"]:focus, input[type="number"]:focus {
   justify-content: center;
 }
 
+.qty-btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
 .qty-value {
   min-width: 26px;
   text-align: center;
@@ -282,3 +311,20 @@ input[type="text"]:focus, input[type="number"]:focus {
 }
 
 #current-code { color: var(--accent); }
+
+.btn-danger {
+  width: 100%;
+  margin-top: 12px;
+  background: var(--danger);
+  color: #2a0906;
+  border: none;
+  border-radius: 10px;
+  padding: 13px 14px;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.btn-danger:active { filter: brightness(0.9); }
+
+#confirm-text strong { color: var(--text); }

@@ -30,6 +30,9 @@ const statusBar = document.getElementById("status-bar");
 const addForm = document.getElementById("add-form");
 const itemNameInput = document.getElementById("item-name");
 const itemQtyInput = document.getElementById("item-qty");
+const itemUnitInput = document.getElementById("item-unit");
+const itemUnitAmountInput = document.getElementById("item-unit-amount");
+const amountGroup = document.getElementById("amount-group");
 const searchInput = document.getElementById("search-input");
 const itemList = document.getElementById("item-list");
 const emptyState = document.getElementById("empty-state");
@@ -39,12 +42,28 @@ const currentCodeLabel = document.getElementById("current-code");
 const newHouseholdInput = document.getElementById("new-household-input");
 const switchHouseholdBtn = document.getElementById("switch-household-btn");
 const closeSettingsBtn = document.getElementById("close-settings-btn");
+const confirmOverlay = document.getElementById("confirm-overlay");
+const confirmText = document.getElementById("confirm-text");
+const confirmDeleteBtn = document.getElementById("confirm-delete-btn");
+const cancelDeleteBtn = document.getElementById("cancel-delete-btn");
 
 const STORAGE_KEY = "kuehltruhe.haushaltscode";
+
+// Baut die Anzeige für einen Artikel:
+// - Reine Stück-Artikel: "2 Stück"
+// - Artikel mit zusätzlicher Mengenangabe: "500 g · 2 Stück"
+function formatMeta(item) {
+  const einheit = item.einheit || "Stück";
+  if (einheit === "Stück" || item.einheitMenge == null) {
+    return item.menge + " Stück";
+  }
+  return item.einheitMenge + " " + einheit + " · " + item.menge + " Stück";
+}
 
 let app, db;
 let unsubscribe = null;
 let allItems = [];
+let pendingDeleteItem = null;
 
 // ---- Firebase initialisieren ----
 function initFirebase() {
@@ -162,6 +181,10 @@ function renderList() {
     minusBtn.className = "qty-btn";
     minusBtn.textContent = "–";
     minusBtn.setAttribute("aria-label", "Menge verringern");
+    minusBtn.disabled = item.menge <= 1;
+    minusBtn.title = minusBtn.disabled
+      ? "Zum Entfernen bitte den Papierkorb benutzen"
+      : "Menge verringern";
     minusBtn.addEventListener("click", () => changeQty(item, -1));
 
     const qtyVal = document.createElement("span");
@@ -178,7 +201,7 @@ function renderList() {
     delBtn.className = "delete-btn";
     delBtn.textContent = "🗑";
     delBtn.setAttribute("aria-label", "Artikel löschen");
-    delBtn.addEventListener("click", () => removeItem(item));
+    delBtn.addEventListener("click", () => askDeleteConfirmation(item));
 
     controls.append(minusBtn, qtyVal, plusBtn, delBtn);
     li.append(info, controls);
@@ -189,21 +212,27 @@ function renderList() {
 function metaLine(item) {
   const meta = document.createElement("span");
   meta.className = "item-meta";
-  meta.textContent = item.menge === 1 ? "1 Stück" : item.menge + " Stück";
+  meta.textContent = formatMeta(item);
   return meta;
 }
 
 // ---- Aktionen ----
-async function addItem(name, qty) {
+async function addItem(name, qty, einheit, einheitMenge) {
   const code = getSavedCode();
   if (!code || !db) return;
   const itemsRef = collection(db, "haushalte", code, "artikel");
 
-  // Falls der Artikel (gleicher Name, klein geschrieben) schon existiert,
-  // Menge erhöhen statt Duplikat anzulegen.
-  const existing = allItems.find(
-    (it) => it.name.toLowerCase() === name.toLowerCase()
-  );
+  // Falls der Artikel schon existiert (gleicher Name, gleiche Einheit UND
+  // bei Mengen-Einheiten auch gleiche Mengenangabe), Anzahl erhöhen statt
+  // Duplikat anzulegen. "Hackfleisch 500 g" und "Hackfleisch 1 kg" bleiben
+  // dabei getrennte Einträge.
+  const existing = allItems.find((it) => {
+    if (it.name.toLowerCase() !== name.toLowerCase()) return false;
+    const itEinheit = it.einheit || "Stück";
+    if (itEinheit !== einheit) return false;
+    if (einheit === "Stück") return true;
+    return (it.einheitMenge ?? null) === (einheitMenge ?? null);
+  });
   if (existing) {
     await changeQty(existing, qty);
     return;
@@ -212,6 +241,8 @@ async function addItem(name, qty) {
   await addDoc(itemsRef, {
     name: name,
     menge: qty,
+    einheit: einheit,
+    einheitMenge: einheit === "Stück" ? null : einheitMenge,
     erstelltAm: serverTimestamp(),
     aktualisiertAm: serverTimestamp(),
   });
@@ -221,12 +252,12 @@ async function changeQty(item, delta) {
   const code = getSavedCode();
   if (!code || !db) return;
   const newQty = item.menge + delta;
+  // Über die +/- Buttons kann die Anzahl nicht unter 1 fallen. Zum
+  // vollständigen Entfernen ist bewusst der Papierkorb (mit Bestätigung)
+  // nötig, damit nichts versehentlich verschwindet.
+  if (newQty < 1) return;
   const ref = doc(db, "haushalte", code, "artikel", item.id);
-  if (newQty <= 0) {
-    await deleteDoc(ref);
-  } else {
-    await updateDoc(ref, { menge: newQty, aktualisiertAm: serverTimestamp() });
-  }
+  await updateDoc(ref, { menge: newQty, aktualisiertAm: serverTimestamp() });
 }
 
 async function removeItem(item) {
@@ -234,6 +265,29 @@ async function removeItem(item) {
   if (!code || !db) return;
   const ref = doc(db, "haushalte", code, "artikel", item.id);
   await deleteDoc(ref);
+}
+
+// ---- Lösch-Bestätigung ----
+function askDeleteConfirmation(item) {
+  pendingDeleteItem = item;
+  confirmText.innerHTML =
+    'Soll <strong>"' +
+    escapeHtml(item.name) +
+    '"</strong> (' +
+    escapeHtml(formatMeta(item)) +
+    ") wirklich gelöscht werden?";
+  confirmOverlay.classList.remove("hidden");
+}
+
+function closeConfirmOverlay() {
+  pendingDeleteItem = null;
+  confirmOverlay.classList.add("hidden");
+}
+
+function escapeHtml(str) {
+  const div = document.createElement("div");
+  div.textContent = str;
+  return div.innerHTML;
 }
 
 // ---- Event-Listener ----
@@ -252,14 +306,41 @@ householdInput.addEventListener("keydown", (e) => {
   if (e.key === "Enter") householdSubmit.click();
 });
 
+itemUnitInput.addEventListener("change", () => {
+  if (itemUnitInput.value === "Stück") {
+    amountGroup.classList.add("hidden");
+    itemUnitAmountInput.value = "";
+  } else {
+    amountGroup.classList.remove("hidden");
+    itemUnitAmountInput.placeholder = "z. B. 500";
+    itemUnitAmountInput.focus();
+  }
+});
+
 addForm.addEventListener("submit", async (e) => {
   e.preventDefault();
   const name = itemNameInput.value.trim();
   const qty = Math.max(1, parseInt(itemQtyInput.value, 10) || 1);
+  const einheit = itemUnitInput.value;
   if (!name) return;
-  await addItem(name, qty);
+
+  let einheitMenge = null;
+  if (einheit !== "Stück") {
+    const amount = parseFloat(itemUnitAmountInput.value);
+    if (!amount || amount <= 0) {
+      itemUnitAmountInput.focus();
+      return; // Bei einer Mengen-Einheit ist die Mengenangabe Pflicht.
+    }
+    einheitMenge = amount;
+  }
+
+  await addItem(name, qty, einheit, einheitMenge);
+
   itemNameInput.value = "";
   itemQtyInput.value = "1";
+  itemUnitInput.value = "Stück";
+  itemUnitAmountInput.value = "";
+  amountGroup.classList.add("hidden");
   itemNameInput.focus();
 });
 
@@ -280,6 +361,17 @@ switchHouseholdBtn.addEventListener("click", () => {
   saveCode(code);
   settingsOverlay.classList.add("hidden");
   showAppScreen(code);
+});
+
+confirmDeleteBtn.addEventListener("click", async () => {
+  if (pendingDeleteItem) {
+    await removeItem(pendingDeleteItem);
+  }
+  closeConfirmOverlay();
+});
+
+cancelDeleteBtn.addEventListener("click", () => {
+  closeConfirmOverlay();
 });
 
 // ---- Start ----
